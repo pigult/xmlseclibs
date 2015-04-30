@@ -37,7 +37,7 @@
  * @author     Robert Richards <rrichards@cdatazone.org>
  * @copyright  2007-2013 Robert Richards <rrichards@cdatazone.org>
  * @license    http://www.opensource.org/licenses/bsd-license.php  BSD License
- * @version    1.3.1
+ * @version    1.3.1-dev
  */
 
 /*
@@ -665,11 +665,11 @@ class XMLSecurityDSig {
     const EXC_C14N = 'http://www.w3.org/2001/10/xml-exc-c14n#';
     const EXC_C14N_COMMENTS = 'http://www.w3.org/2001/10/xml-exc-c14n#WithComments';
 
-    const template = '<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
-  <ds:SignedInfo>
-    <ds:SignatureMethod />
-  </ds:SignedInfo>
-</ds:Signature>';
+    const template = '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <SignedInfo>
+    <SignatureMethod />
+  </SignedInfo>
+</Signature>';
 
     public $sigNode = NULL;
     public $idKeys = array();
@@ -677,7 +677,7 @@ class XMLSecurityDSig {
     private $signedInfo = NULL;
     private $xPathCtx = NULL;
     private $canonicalMethod = NULL;
-    private $prefix = 'ds';
+    private $prefix = '';
     private $searchpfx = 'secdsig';
 
     /* This variable contains an associative array of validated nodes. */
@@ -732,9 +732,9 @@ class XMLSecurityDSig {
     public function createNewSignNode($name, $value=NULL) {
         $doc = $this->sigNode->ownerDocument;
         if (! is_null($value)) {
-            $node = $doc->createElementNS(XMLSecurityDSig::XMLDSIGNS, $this->prefix.':'.$name, $value);
+            $node = $doc->createElementNS(XMLSecurityDSig::XMLDSIGNS, $name, $value);
         } else {
-            $node = $doc->createElementNS(XMLSecurityDSig::XMLDSIGNS, $this->prefix.':'.$name);
+            $node = $doc->createElementNS(XMLSecurityDSig::XMLDSIGNS, $name);
         }
         return $node;
     }
@@ -1085,7 +1085,7 @@ class XMLSecurityDSig {
         if (! $node instanceof DOMDocument) {
             $uri = NULL;
             if (! $overwrite_id) {
-                $uri = $node->getAttributeNS($prefix_ns, $id_name);
+                $uri = $node->getAttributeNS($prefix_ns, $attname);
             }
             if (empty($uri)) {
                 $uri = XMLSecurityDSig::generate_GUID();
@@ -1232,8 +1232,10 @@ class XMLSecurityDSig {
                 $nodeset = $xpath->query($query, $sInfo);
                 $sMethod = $nodeset->item(0);
                 $sMethod->setAttribute('Algorithm', $objKey->type);
-                $data = $this->canonicalizeData($sInfo, $this->canonicalMethod);
-                $sigValue = base64_encode($this->signData($objKey, $data));
+
+				$data = $this->canonicalizeData($sInfo, $this->canonicalMethod);
+				$data = preg_replace("/>\s+</", "><", $data);
+				$sigValue = base64_encode($this->signData($objKey, $data));
                 $sigValueNode = $this->createNewSignNode('SignatureValue', $sigValue);
                 if ($infoSibling = $sInfo->nextSibling) {
                     $infoSibling->parentNode->insertBefore($sigValueNode, $infoSibling);
@@ -1316,7 +1318,7 @@ class XMLSecurityDSig {
         }
     }
 
-    static function staticAdd509Cert($parentRef, $cert, $isPEMFormat=TRUE, $isURL=False, $xpath=NULL, $options=NULL) {
+    static function staticAdd509Cert($parentRef, $cert, $isPEMFormat=TRUE, $isURL=False, $xpath=NULL) {
         if ($isURL) {
             $cert = file_get_contents($cert);
         }
@@ -1335,7 +1337,7 @@ class XMLSecurityDSig {
         $keyInfo = $nodeset->item(0);
         if (! $keyInfo) {
             $inserted = FALSE;
-            $keyInfo = $baseDoc->createElementNS(XMLSecurityDSig::XMLDSIGNS, 'ds:KeyInfo');
+            $keyInfo = $baseDoc->createElementNS(XMLSecurityDSig::XMLDSIGNS, 'KeyInfo');
         
             $query = "./secdsig:Object";
             $nodeset = $xpath->query($query, $parentRef);
@@ -1352,52 +1354,20 @@ class XMLSecurityDSig {
         // Add all certs if there are more than one
         $certs = XMLSecurityDSig::staticGet509XCerts($cert, $isPEMFormat);
 
-        // Attach X509 data node
-        $x509DataNode = $baseDoc->createElementNS(XMLSecurityDSig::XMLDSIGNS, 'ds:X509Data');
+        // Atach X509 data node
+        $x509DataNode = $baseDoc->createElementNS(XMLSecurityDSig::XMLDSIGNS, 'X509Data');
         $keyInfo->appendChild($x509DataNode);
 
-        $issuerSerial = FALSE;
-        $subjectName = FALSE;
-        if (is_array($options)) {
-            if (! empty($options['issuerSerial'])) {
-                $issuerSerial = TRUE;
-            }
-        }
-        
-        // Attach all certificate nodes and any additional data
+        // Atach all certificate nodes
         foreach ($certs as $X509Cert){
-            if ($issuerSerial) {
-                if ($certData = openssl_x509_parse("-----BEGIN CERTIFICATE-----\n".chunk_split($X509Cert, 64, "\n")."-----END CERTIFICATE-----\n")) {
-                    if ($issuerSerial && ! empty($certData['issuer']) && ! empty($certData['serialNumber'])) {
-                        if (is_array($certData['issuer'])) {
-                            $parts = array();
-                            foreach ($certData['issuer'] AS $key => $value) {
-                                array_unshift($parts, "$key=$value" . $issuer);
-                            }
-                            $issuerName = implode(',', $parts);
-                        } else {
-                            $issuerName = $certData['issuer'];
-                        }
-                        
-                        $x509IssuerNode = $baseDoc->createElementNS(XMLSecurityDSig::XMLDSIGNS, 'ds:X509IssuerSerial');
-                        $x509DataNode->appendChild($x509IssuerNode);
-                        
-                        $x509Node = $baseDoc->createElementNS(XMLSecurityDSig::XMLDSIGNS, 'ds:X509IssuerName', $issuerName);
-                        $x509IssuerNode->appendChild($x509Node);
-                        $x509Node = $baseDoc->createElementNS(XMLSecurityDSig::XMLDSIGNS, 'ds:X509SerialNumber', $certData['serialNumber']);
-                        $x509IssuerNode->appendChild($x509Node);
-                    }
-                }
-                
-            }
-            $x509CertNode = $baseDoc->createElementNS(XMLSecurityDSig::XMLDSIGNS, 'ds:X509Certificate', $X509Cert);
+            $x509CertNode = $baseDoc->createElementNS(XMLSecurityDSig::XMLDSIGNS, 'X509Certificate', $X509Cert);
             $x509DataNode->appendChild($x509CertNode);
         }
     }
 
-    public function add509Cert($cert, $isPEMFormat=TRUE, $isURL=False, $options=NULL) {
+    public function add509Cert($cert, $isPEMFormat=TRUE, $isURL=False) {
          if ($xpath = $this->getXPathObj()) {
-            self::staticAdd509Cert($this->sigNode, $cert, $isPEMFormat, $isURL, $xpath, $options);
+            self::staticAdd509Cert($this->sigNode, $cert, $isPEMFormat, $isURL, $xpath);
          }
     }
     
