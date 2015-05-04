@@ -1,5 +1,5 @@
 {
-    "name": "rnijveld/xmlseclibs",
+    "name": "pigult/xmlseclibs",
     "description": "A PHP library for XML Security",
     "authors": [
         { "name": "Rob Richards" }
