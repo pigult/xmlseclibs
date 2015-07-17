@@ -2,7 +2,7 @@
 /**
  * xmlseclibs.php
  *
- * Copyright (c) 2007-2013, Robert Richards <rrichards@cdatazone.org>.
+ * Copyright (c) 2007-2010, Robert Richards <rrichards@cdatazone.org>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,7 +35,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  * @author     Robert Richards <rrichards@cdatazone.org>
- * @copyright  2007-2013 Robert Richards <rrichards@cdatazone.org>
+ * @copyright  2007-2011 Robert Richards <rrichards@cdatazone.org>
  * @license    http://www.opensource.org/licenses/bsd-license.php  BSD License
  * @version    1.3.1-dev
  */
@@ -1126,6 +1126,7 @@ class XMLSecurityDSig {
 
         $canonicalData = $this->processTransforms($refNode, $node);
         $digValue = $this->calculateDigest($algorithm, $canonicalData);
+		//var_dump($digValue, $canonicalData);
 
         $digestMethod = $this->createNewSignNode('DigestMethod');
         $refNode->appendChild($digestMethod);
@@ -1235,6 +1236,8 @@ class XMLSecurityDSig {
 
 				$data = $this->canonicalizeData($sInfo, $this->canonicalMethod);
 				$data = preg_replace("/>\s+</", "><", $data);
+				//$data = str_replace('  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"', "", $data);
+                //var_dump($this->canonicalMethod, $sInfo);
 				$sigValue = base64_encode($this->signData($objKey, $data));
                 $sigValueNode = $this->createNewSignNode('SignatureValue', $sigValue);
                 if ($infoSibling = $sInfo->nextSibling) {
