@@ -1126,7 +1126,6 @@ class XMLSecurityDSig {
 
         $canonicalData = $this->processTransforms($refNode, $node);
         $digValue = $this->calculateDigest($algorithm, $canonicalData);
-		//var_dump($digValue, $canonicalData);
 
         $digestMethod = $this->createNewSignNode('DigestMethod');
         $refNode->appendChild($digestMethod);
@@ -1236,8 +1235,6 @@ class XMLSecurityDSig {
 
 				$data = $this->canonicalizeData($sInfo, $this->canonicalMethod);
 				$data = preg_replace("/>\s+</", "><", $data);
-				//$data = str_replace('  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"', "", $data);
-                //var_dump($this->canonicalMethod, $sInfo);
 				$sigValue = base64_encode($this->signData($objKey, $data));
                 $sigValueNode = $this->createNewSignNode('SignatureValue', $sigValue);
                 if ($infoSibling = $sInfo->nextSibling) {
